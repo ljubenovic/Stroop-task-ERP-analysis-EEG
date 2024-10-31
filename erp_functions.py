@@ -3,10 +3,12 @@ import matplotlib.pyplot as plt
 import csv
 import os
 from scipy.signal import find_peaks
+from utility_functions import *
 
-def segment_into_epoch(eeg, fs, event_type, event_latencies, epoch_duration, pre_stim_duration):
+############################################################################################################
+def segment_into_epoch(eeg, fs, event_latencies, epoch_duration, pre_stim_duration):
 
-    #event_type = np.concatenate((np.ones(32,),2*np.ones(32,)),axis=-1)
+    event_type = np.concatenate((np.ones(32,),2*np.ones(32,)),axis=-1)
 
     epoch_duration_samp = int(epoch_duration/1000*fs)
     pre_stim_duration_samp = int(pre_stim_duration/1000*fs)
@@ -36,7 +38,7 @@ def segment_into_epoch(eeg, fs, event_type, event_latencies, epoch_duration, pre
 
     return epochs_1, epochs_2
 
-
+############################################################################################################
 def epoch_baseline_correction(epochs, fs, baseline_duration):
 
     (n_chan, epoch_len, n_epochs) = epochs.shape
@@ -59,8 +61,9 @@ def epoch_baseline_correction(epochs, fs, baseline_duration):
         epochs_new[:,:,i] = epoch_new
 
     return epochs_new
+    #return epochs[:,baseline_len:] # without baseline correction
 
-
+############################################################################################################
 def epoch_averaging(epochs):
 
     # epochs: (n_chan, epoch_duration, n_epochs)
@@ -69,29 +72,72 @@ def epoch_averaging(epochs):
 
     return epoch_avg
 
+############################################################################################################
+def epoch_aligned_averaging(epochs, fs, time_window, n_samp):
 
-def n200_extraction(epoch, fs, time_window):
+    (n_chan, epoch_duration, n_epochs) = epochs.shape
+
+    amps = np.zeros((n_chan, n_epochs))
+    lats = np.zeros((n_chan, n_epochs))
+
+    epochs_clipped = np.zeros((n_chan, n_samp, n_epochs))
+
+    for i in range(n_epochs):
+
+        for j in range(n_chan):
+
+            (amp, lat) = erp_extraction(epochs[j,:,i], fs, time_window)
+
+            amps[j,i] = np.round(amp,3)
+            lats[j,i] = lat
+
+            epochs_clipped[j,:,i] = epochs[j, int(lat-n_samp//2) : int(lat+n_samp//2), i]
+
+    epochs_aligned_avg = epoch_averaging(epochs_clipped)
+
+    return epochs_aligned_avg, amps, lats
+
+############################################################################################################
+def erp_extraction(epoch, fs, time_window):
 
     time_window = (int(time_window[0]/1000*fs), int(time_window[1]/1000*fs))
 
-    epoch_mask = np.zeros_like(epoch)
-    epoch_mask[time_window[0]:time_window[1]] = np.ones((time_window[1]-time_window[0],))
+    peaks, _ = find_peaks(-epoch[time_window[0]:time_window[1]])
+    peaks = peaks + time_window[0]
+    if np.any(peaks):
+        peak_idx = np.argmin(epoch[peaks])
+        peak = peaks[peak_idx]
 
-    epoch_masked = np.where(epoch_mask, epoch, np.nan)
+        erp_amp = np.abs(epoch[peak])   # absolute value of N200 peak amplitude
+        #erp_amp = np.mean(epoch[time_window[0]:time_window[1]])
+        erp_latency = peak/fs*1000      # ms
+    else:
+        erp_amp = np.nan
+        erp_latency = np.nan
 
-    min_idx = np.nanargmin(epoch_masked)
+    return (np.round(erp_amp,3), erp_latency)
 
-    n200_amp = np.abs(epoch[min_idx])   # absolute value of N200 peak amplitude
-    n200_latency = min_idx/fs*1000      # ms
+############################################################################################################  
+def erp_extraction_all_channels(epochs, fs, time_window):
 
-    return (n200_amp, n200_latency)
+    n_chan, _ = epochs.shape
+    amps = np.zeros((n_chan,))
+    lats = np.zeros((n_chan,))
 
+    for i in range(n_chan):
+        epoch = epochs[i,:]
+        amp, lat = erp_extraction(epoch, fs, time_window)
+        amps[i] = amp
+        lats[i] = lat
     
+    return (amps, lats)
+
+############################################################################################################
 def erp_extraction_per_channel(epochs, fs, chanlocs, S_id, type, time_window, channel = 'FZ'):
 
     (n_chan, _) = epochs.shape
 
-    csv_path = os.path.join('data','N200','S{}_{}.csv'.format(S_id,type))
+    csv_path = os.path.join('data','N200','S{}_N200_{}.csv'.format(S_id,type))
     if os.path.exists(csv_path):
         os.remove(csv_path)
 
@@ -106,10 +152,13 @@ def erp_extraction_per_channel(epochs, fs, chanlocs, S_id, type, time_window, ch
 
             epoch_chan = epochs[i,:]
 
-            n200_amp, n200_latency = n200_extraction(epoch_chan, fs, time_window)
+            n200_amp, n200_latency = erp_extraction(epoch_chan, fs, time_window)
             writer.writerow([ch, n200_amp, n200_latency])
 
             if ch == channel and n200_amp:
+
+                amp = n200_amp
+                lat = n200_latency
 
                 print('S_id: '+ str(S_id))
                 print('-' + type + ' stimulus-')
@@ -117,45 +166,10 @@ def erp_extraction_per_channel(epochs, fs, chanlocs, S_id, type, time_window, ch
                 print('\tN200 amplitude: {:.1f}'.format(n200_amp))
                 print('\tN200 latency: {:.0f} ms'.format(n200_latency))
 
-    return
+    return (amp, lat)
 
-
-def erp_extraxtion_averaged_channels(epochs, fs, chanlocs, S_id, type, time_window, relevant_channels):
-
-    (_, n_samp) = epochs.shape
-
-    epochs_relevant = []
-    for ch in relevant_channels:
-        if ch in chanlocs:
-            idx = chanlocs.index(ch)
-            epochs_relevant.append(epochs[idx,:])
-
-    epochs_relevant = np.reshape(epochs_relevant, newshape=(len(epochs_relevant), len(epochs_relevant[0])))
-    
-    epoch_avg = np.mean(epochs_relevant, axis=0)
-
-    time_window = (int(time_window[0]/1000*fs), int(time_window[1]/1000*fs))
-    
-    (n200_amp, n200_latency) = n200_extraction(epoch_avg, fs, time_window)
-
-    t = 1000*np.arange(0, n_samp/fs, 1/fs)
-
-    plt.figure(figsize=(10,4))
-    plt.plot(t, epoch_avg)
-    plt.title('Averaged epoches across the channels: ' + ", ".join(relevant_channels) + 
-              "\n N200: latency = {:.0f} ms, amplitude = {:.1f} a.u.".format(n200_latency, n200_amp))
-    plt.xlabel('t [ms]'); plt.ylabel('amplitude [a.u.]')
-    plt.grid(which='both')
-    plt.xlim(time_window)
-    
-    path = os.path.join('data','Graphs','S{}'.format(S_id),'N200_avg_{}.png'.format(type))
-    plt.savefig(path)
-    plt.close()
-
-    return (n200_amp, n200_latency)
-
-
-def single_trial_erp_analysis(epochs, fs, chanlocs, S_id, type, time_window, channel):
+############################################################################################################
+def single_trial_erp_analysis(epochs, fs, chanlocs, time_window, channel):
 
     (n_ch, n_samp, n_stim) = epochs.shape
 
@@ -167,31 +181,12 @@ def single_trial_erp_analysis(epochs, fs, chanlocs, S_id, type, time_window, cha
     for i in range(n_stim):
         epoch = epochs_ch[:,i]
 
-        (n200_amp, n200_latency) = n200_extraction(epoch, fs, time_window)
+        (n200_amp, n200_latency) = erp_extraction(epoch, fs, time_window)
         n200_amp_arr.append(n200_amp)
         n200_latency_arr.append(n200_latency)
     
     n200_amp_arr = np.array(n200_amp_arr)
-    n200_latency_arr = np.array(n200_latency)
+    n200_latency_arr = np.array(n200_latency_arr)
 
-    plt.figure()
-
-
-    return
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return (n200_amp_arr, n200_latency_arr)
 
