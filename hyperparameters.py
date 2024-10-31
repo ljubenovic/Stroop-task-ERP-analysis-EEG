@@ -62,11 +62,14 @@ blink_epoch_duration = 1000
 
 ortho = False
 extended = False
-threshold_z = 1
+threshold_z = 2
 
 epoch_duration = 1000
 pre_stim_duration = 100
-time_window = (250, 320)    # expected averaged latency ~ 281 ms
-focused_channel = 'FCZ' # expected maximal amplitude at FCz
+time_window = (100, 250)    # expected averaged latency ~ 281 ms
+time_window_200 = (130,260)
+time_window_400 = (320,520)
+time_window_lsp = (580,900)
+focused_channel = 'FZ' # expected maximal amplitude at FCz
 #relevant_channels = ['FC3','FC1','FCZ','FC2','FC4','C3','C1','CZ','C2','C4']    # Electrodes of the fronto-central cortex
 relevant_channels = ['FZ','FCZ']
