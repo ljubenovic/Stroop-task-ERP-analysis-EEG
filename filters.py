@@ -1,7 +1,6 @@
-import numpy as np
 from scipy.signal import butter, filtfilt, freqz, firwin
 
-
+############################################################################################################
 def butter_filter(data, fs, order = None, cutoff_low = None, cutoff_high = None):
     """
     Apply a Butterworth filter (high-pass, low-pass, or band-pass) to multi-channel data.
@@ -64,7 +63,7 @@ def butter_filter(data, fs, order = None, cutoff_low = None, cutoff_high = None)
     
     return data_filt, freq, h
 
-
+############################################################################################################
 def bandpass_fir_filter(data, fs, cutoff_low, cutoff_high, numtaps=101, window='hann'):
     """
     Apply a bandpass filter to a multi-channel signal using an FIR filter with a specified window.
