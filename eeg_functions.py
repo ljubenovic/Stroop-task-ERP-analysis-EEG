@@ -1,5 +1,6 @@
 import numpy as np
 
+############################################################################################################
 def rereference_eeg(eeg, chanlocs, reference_chan='CZ'):
 
     if reference_chan not in chanlocs:
@@ -14,7 +15,7 @@ def rereference_eeg(eeg, chanlocs, reference_chan='CZ'):
 
     return eeg_reref, chanlocs
 
-
+############################################################################################################
 def exclude_non_eeg_channels(eeg, chanlocs):
 
     eog_channels = ['HEO', 'VEO']
@@ -34,11 +35,13 @@ def exclude_non_eeg_channels(eeg, chanlocs):
 
     return eeg_new, chanlocs_new, eog, eog_chanlocs, mastoid, mastoid_chanlocs
 
-
-def remove_irrelevant_segments(eeg, fs, event_latency):
+############################################################################################################
+def eeg_segmentation(eeg, fs, event_latency):
 
     n_stim = len(event_latency)
     n_block_stim = 16
+
+    print(len(event_latency))
 
     pre_stim_len = int(2*fs)
     post_stim_len = int(2*fs)
