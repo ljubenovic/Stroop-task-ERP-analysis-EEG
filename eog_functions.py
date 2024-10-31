@@ -4,6 +4,7 @@ import numpy as np
 from scipy.signal import find_peaks
 from scipy.stats import zscore, pearsonr
 
+############################################################################################################
 def detect_blinks(eog, fs, epoch_duration, percentile=1):
     """
     Detect significant blink-related peaks in the multi-channel EOG signal.
@@ -42,7 +43,7 @@ def detect_blinks(eog, fs, epoch_duration, percentile=1):
 
     return blink_epochs, blink_peaks
 
-
+############################################################################################################
 def find_blink_related_components(S_id, components, blink_epochs, blink_peaks, blink_epoch_duration, threshold_z=2):
     """
     Reject independent components highly correlated with blinks.
@@ -69,10 +70,11 @@ def find_blink_related_components(S_id, components, blink_epochs, blink_peaks, b
 
         artifact_indices = []
 
+        writer.writerow(['comp idx','average Pearson corr'])
+
         for ch in range(len(blink_peaks)):
 
             writer.writerow(['EOG ch {}:'.format(ch)])
-            writer.writerow(['comp idx','average Pearson corr'])
 
             blink_peaks_ch = blink_peaks[ch]
             blink_epochs_ch = blink_epochs[ch]
